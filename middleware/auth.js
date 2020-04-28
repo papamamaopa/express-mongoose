@@ -90,7 +90,10 @@ router.get("/", [
 
 // get all users
 router.get("/all", (req, res) => {
-  res.send("Get all users");
+  const users = User.find();
+  if (!users) res.status(400).send("no user available!")
+
+  res.status(400).send(users);
 })
 
 // update user by id
