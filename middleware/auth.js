@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const { check, validationResult } = require('express-validator');
+const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 // create new user 
@@ -42,8 +43,34 @@ router.post("/register", [
 });
 
 // login with user (returns jwt  token with _id of mongo doc)
-router.post("/login", (req, res) => {
-  res.send("Login");
+router.post("/login", [
+  check("username").notEmpty().isLength({ min: 4, max: 8 }),
+  check("password").notEmpty().isLength({ min: 8 })
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  // check if user already exists
+  const userExists = await User.exists({ username: req.body.username });
+  if (!userExists) res.status(400).send("user not found!");
+
+  const user = await User.findOne({ username: req.body.username })
+
+  const validPassword = await bcrypt.compare(req.body.password, user.password);
+  if (!validPassword)
+    return res.status(400).send("Your name or password is wrong!");
+
+  // Create and assing token
+  const token = jwt.sign(
+    {
+      _id: user.id
+    },
+    process.env.TOKEN_SECRET
+  );
+
+  res.header("auth-token", token).send(token);
 })
 
 // get user by id
