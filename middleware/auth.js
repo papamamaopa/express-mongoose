@@ -74,8 +74,18 @@ router.post("/login", [
 })
 
 // get user by id
-router.get("/", (req, res) => {
-  res.send("Get user by id");
+router.get("/", [
+  check("id").notEmpty()
+], (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const userExists = User.exists({ _id: req.body.id });
+  if (!userExists) res.status(400).send("user not found!")
+
+  res.status(400).send(user);
 })
 
 // get all users
