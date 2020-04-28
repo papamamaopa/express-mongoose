@@ -70,7 +70,7 @@ router.post("/login", [
     process.env.TOKEN_SECRET
   );
 
-  res.header("auth-token", token).send(token);
+  return res.header("auth-token", token).send(token);
 })
 
 // get user by id
@@ -83,32 +83,65 @@ router.get("/", [
   }
 
   const userExists = User.exists({ _id: req.body.id });
-  if (!userExists) res.status(400).send("user not found!")
+  if (!userExists) return res.status(400).send("user not found!")
 
-  res.status(400).send(user);
+  return res.status(400).send(user);
 })
 
 // get all users
 router.get("/all", (req, res) => {
   const users = User.find();
-  if (!users) res.status(400).send("no user available!")
+  if (!users) return res.status(400).send("users not found!")
 
-  res.status(400).send(users);
+  return res.status(400).send(users);
 })
 
 // update user by id
-router.patch("/", (req, res) => {
-  res.send("update user")
+router.patch("/", [
+  check("id").notEmpty(),
+  check("firstname").notEmpty().isString().isLength({ min: 4, max: 12 }),
+  check("lastname").notEmpty().isString().isLength({ min: 4, max: 12 }),
+  check("username").notEmpty().isString().isLength({ min: 4, max: 8 }),
+  check("email").notEmpty().isEmail(),
+  check("password").notEmpty().isString().isLength({ min: 8 })
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const userExists = await User.exists({ _id: req.body.id });
+  if (!userExists) return res.status(400).send("user not found");
+
+  // Hash the password
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(req.body.password, salt);
+
+  User.update({ _id: req.body.id }, { firstname: req.body.firstname, lastname: req.body.lastname, username: req.body.username, email: req.body.email, password: hashedPassword })
+  return res.status("200").send("successful updated!")
 })
 
 // delete user by id
-router.delete("/", (req, res) => {
-  res.send("delete user by id");
+router.delete("/", [
+  check("id").notEmpty(),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const userExists = await User.find({ _id: req.body.id });
+  if (!userExists) return res.status(400).send("user not found!")
+
+  User.deleteOne({ _id: req.body.id })
+  return res.status(200).send("successful removed")
 })
 
 // delete all users (dev)
-router.delete("/all", (req, res) => {
-  res.send("delete all users")
+router.delete("/all", async (req, res) => {
+  const users = await User.find();
+  User.deleteMany(...users);
+  res.status(200).send("users successful deleted")
 })
 
 module.exports = router;
